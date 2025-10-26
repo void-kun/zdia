@@ -16,7 +16,7 @@ import os
 
 from .visgraph import VisualGraph
 from .analyzer import CallGraphVisitor
-from .writers import DotWriter, HTMLWriter, SVGWriter, TgfWriter, YedWriter
+from .writers import DotWriter, HTMLWriter, SVGWriter, TgfWriter, YedWriter, JSONWriter
 
 
 def main(cli_args=None):
@@ -61,6 +61,14 @@ def main(cli_args=None):
         help="write graph to FILE",
         metavar="FILE",
         default=None,
+    )
+
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        dest="json",
+        help="output graph as JSON (nodes + edges)",
     )
 
     parser.add_argument(
@@ -212,8 +220,15 @@ def main(cli_args=None):
 
     filenames = [fn2 for fn in unknown_args for fn2 in glob(fn, recursive=True)]
 
+    # normalize filenames to absolute paths so downstream code (which may
+    # compare paths against a provided --root) behaves consistently even if
+    # the user passed relative paths. This allows callers to pass relative
+    # paths without needing to resolve them themselves.
+    filenames = [os.path.abspath(f) for f in filenames]
+
     # determine root
     if known_args.root is not None:
+        # accept a relative root and convert to absolute
         root = os.path.abspath(known_args.root)
     else:
         root = None
@@ -337,6 +352,9 @@ def main(cli_args=None):
 
     if known_args.yed:
         writer = YedWriter(graph, output=known_args.filename, logger=logger)
+
+    if known_args.json:
+        writer = JSONWriter(graph, output=known_args.filename, logger=logger)
 
     if writer:
         writer.run()

@@ -4,6 +4,7 @@
 """Graph markup writers."""
 
 import io
+import json
 import logging
 import os
 import subprocess
@@ -357,3 +358,72 @@ class YedWriter(Writer):
         self.write("  </graph>")
         self.dedent()
         self.write("</graphml>")
+
+class JSONWriter(Writer):
+    """Write the visual graph to a JSON file.
+
+    The output JSON has the shape:
+    {
+      "nodes": [ {id,label,flavor,group,fill_color,text_color,level,filename,name}, ... ],
+      "edges": [ {source,target,flavor,color}, ... ]
+    }
+    """
+
+    def run(self):
+        self.log("%s running" % type(self))
+        try:
+            if isinstance(self.output, io.StringIO):  # write to stream
+                outstream = self.output
+                close_after = False
+            else:
+                outstream = open(self.output, "w") if self.output else sys.stdout
+                close_after = bool(self.output)
+        except TypeError:
+            outstream = sys.stdout
+            close_after = False
+
+        data = {
+            "nodes": self._collect_nodes(self.graph),
+            "edges": self._collect_edges(self.graph),
+        }
+
+        # dump JSON
+        json.dump(data, outstream, indent=2)
+
+        if close_after:
+            outstream.close()
+
+    def _collect_nodes(self, graph):
+        nodes = []
+        for n in graph.nodes:
+            nodes.append(
+                {
+                    "id": n.id,
+                    "label": n.label,
+                    "flavor": n.flavor,
+                    "group": n.group,
+                    "fill_color": n.fill_color,
+                    "text_color": n.text_color,
+                    "level": n.level,
+                    "filename": n.filename,
+                    "name": n.name,
+                }
+            )
+        for sub in graph.subgraphs:
+            nodes.extend(self._collect_nodes(sub))
+        return nodes
+
+    def _collect_edges(self, graph):
+        edges = []
+        for e in graph.edges:
+            edges.append(
+                {
+                    "source": e.source.id,
+                    "target": e.target.id,
+                    "flavor": e.flavor,
+                    "color": e.color,
+                }
+            )
+        for sub in graph.subgraphs:
+            edges.extend(self._collect_edges(sub))
+        return edges

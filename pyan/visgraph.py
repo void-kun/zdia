@@ -75,15 +75,33 @@ class Colorizer:
 class VisualNode(object):
     """
     A node in the output graph: colors, internal ID, human-readable label, ...
+
+    Carries optional metadata useful for JSON export such as
+    nesting level, source filename and original full name.
     """
 
-    def __init__(self, id, label="", flavor="", fill_color="", text_color="", group=""):
+    def __init__(
+        self,
+        id,
+        label="",
+        flavor="",
+        fill_color="",
+        text_color="",
+        group="",
+        level=None,
+        filename=None,
+        name=None,
+    ):
         self.id = id  # graphing software friendly label (no special chars)
         self.label = label  # human-friendly label
         self.flavor = flavor
         self.fill_color = fill_color
         self.text_color = text_color
         self.group = group
+        # optional metadata for richer outputs
+        self.level = level
+        self.filename = filename
+        self.name = name
 
     def __repr__(self):
         optionals = [
@@ -206,26 +224,30 @@ class VisualGraph(object):
             # Append the node's flavor (type) to the human-readable label
             # so it is visible in output graphs (e.g. function, class, module).
             label_text = labeler(node)
-            # repr(node.flavor) returns a readable flavor string from the Flavor enum
-            flavor_text = repr(node.flavor)
-            label_with_type = f"{label_text}\\n({flavor_text})"
             visual_node = VisualNode(
                 id=node.get_label(),
-                label=label_with_type,
+                label=label_text,
                 flavor=repr(node.flavor),
                 fill_color=fill_RGBA,
                 text_color=text_RGB,
                 group=idx,
+                level=node.get_level(),
+                filename=node.filename,
+                name=node.get_name(),
             )
             nodes_dict[node] = visual_node
 
             # next namespace? determine grouping namespace (top-level or full)
-            group_ns = node.get_toplevel_namespace() if group_by_toplevel else node.namespace
+            group_ns = (
+                node.get_toplevel_namespace() if group_by_toplevel else node.namespace
+            )
             if grouped and group_ns != prev_namespace:
                 if not prev_namespace:
                     logger.info("New namespace %s" % (group_ns))
                 else:
-                    logger.info("New namespace %s, old was %s" % (group_ns, prev_namespace))
+                    logger.info(
+                        "New namespace %s, old was %s" % (group_ns, prev_namespace)
+                    )
                 prev_namespace = group_ns
 
                 # use a safe id for the cluster and the human label as the group namespace
